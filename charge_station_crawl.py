@@ -16,6 +16,7 @@ import threading
 import asyncio
 import aiohttp
 import httpx
+import httpcore
 from pyquery import PyQuery as pq
 
 import time
@@ -39,7 +40,7 @@ proxy_gen_jg = ProxyUtil_JG()
 ua_gen = UserAgent()     # 尝试直接实例化
 
 session = None
-limits = httpx.Limits(max_connections=5,max_keepalive_connections=5)
+limits = httpx.Limits(max_connections=9,max_keepalive_connections=8)
 
 def time_format():
     return f'{datetime.now()} '
@@ -59,13 +60,19 @@ header_common = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.
          }
 UA_STANDBY = 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.18362'
 
+channel = 'zm'
+
 """通用方法"""
 def get_proxy(cur_url,cur_adcode,cur_header):
     try:
-        ip = proxy_gen.output_proxy(cur_adcode,cur_header,cur_url)
-        if ip == '121':
-            ic('output proxy from jg')
-            ip == proxy_gen_jg.output_proxy(cur_adcode,cur_header,cur_url)     # 从不同途径获取IP
+        global channel
+        if channel == 'zm':
+            ip = proxy_gen.output_proxy(cur_adcode,cur_header,cur_url)
+            if ip == '121':
+                ic(f'output proxy from jg,cause of {ip}')
+                channel = 'jg'
+        if channel == 'jg':
+            ip = proxy_gen_jg.output_proxy(cur_adcode,cur_header,cur_url)     # 从不同途径获取IP
         return ip
     except Exception as ex:
         ic(traceback.format_exc())
@@ -347,9 +354,9 @@ async def crawl_coro(poi_base_data,r_con_crawl_detail,msg_id,cur_header,the_prox
                 else:
                     ic(f'other status_code:{resp_code}')     # 除反爬外，也有可能出现站点失效等问题
                     raise Exception('other exceptions')
-    except Exception as ex:     # 捕获超时类，此类将重试(和403反爬一样。其他异常将放到error_stream)
-        ic(f'error poi_id:{poi_id}')
-        ic(traceback.format_exc())
+    # 捕获超时类，此类将重试(和403反爬一样。其他异常将放到error_stream)
+    except httpx.ProxyError as ex:
+        ic(f'httpx.ProxyError,poi_id:{poi_id}')
         if 'retry' in poi_base_data.keys():
             retry = int(poi_base_data['retry']) + 1
         else:
@@ -361,6 +368,10 @@ async def crawl_coro(poi_base_data,r_con_crawl_detail,msg_id,cur_header,the_prox
             r_con_crawl_detail.xadd(stream_name_base, {'id':poi_id,'district_code':district_code,'retry':retry})
         # 这里爬取超时的IP不用刻意处理，在下次提取IP前验证IP有效性时会自动检测
         ack_type = 'damn'
+    except Exception as ex_other:
+        ic(f'other error poi_id:{poi_id}')
+        ic(traceback.format_exc())
+        ack_type = 'suck'
     finally:
         ic(f'{ack_type} ack from id {msg_id} to base')
         r_con_crawl_detail.xack(stream_name_base, group_name, msg_id)     # 无论是否爬取成功,都需要回应原stream避免堵塞

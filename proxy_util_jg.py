@@ -4,9 +4,8 @@ import re
 import time
 import pandas as pd
 from pyquery import PyQuery as pq
-import redis
 
-"""初始化极光表（芝麻代理中可供提取的城市和省份代码）"""
+"""初始化极光表（极光代理中可供提取的城市和省份代码）"""
 def get_proxy_source_df():
     go_ahead = True
     page_num = 1
@@ -38,8 +37,8 @@ class ProxyUtil_JG:
         self.dynamic_proxy_table = {}
         self.proxy_select = None
         self.df_proxy_source_from_jg = get_proxy_source_df()
-        self.proxy_recorder = open(r'logs\proxy.log','a+',encoding='utf-8')
-        self.proxy_recorder.write('*****proxy produce begin*****\n')
+        self.proxy_recorder = open(r'logs\proxy_jg.log','a+',encoding='utf-8')
+        self.proxy_recorder.write('*****proxy_jg produce begin*****\n')
 
     def proxy_logger(self,msg):
         record_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())

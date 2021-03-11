@@ -4,7 +4,6 @@ import re
 import time
 import pandas as pd
 from pyquery import PyQuery as pq
-import redis
 
 """初始化芝麻表（芝麻代理中可供提取的城市和省份代码）"""
 def get_proxy_source_df():
@@ -38,8 +37,8 @@ class ProxyUtil:
         self.dynamic_proxy_table = {}
         self.proxy_select = None
         self.df_proxy_source_from_zm = get_proxy_source_df()
-        self.proxy_recorder = open(r'logs\proxy.log','a+',encoding='utf-8')
-        self.proxy_recorder.write('*****proxy produce begin*****\n')
+        self.proxy_recorder = open(r'logs\proxy_zm.log','a+',encoding='utf-8')
+        self.proxy_recorder.write('*****proxy_zm produce begin*****\n')
 
     def proxy_logger(self,msg):
         record_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
@@ -49,14 +48,14 @@ class ProxyUtil:
 
     def get_proxy_from_zm(self,num,province_code,city_code,level_code):
         if level_code == 1:
-            # api_zm = f'http://webapi.http.zhimacangku.com/getip?num={num}&type=2&pro={province_code}&city={city_code}&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions='
-            api_zm = f'http://http.tiqu.letecs.com/getip3?num={num}&type=2&pro={province_code}&city={city_code}&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions=&gm=4'
+            api_zm = f'http://webapi.http.zhimacangku.com/getip?num={num}&type=2&pro={province_code}&city={city_code}&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions='
+            # api_zm = f'http://http.tiqu.letecs.com/getip3?num={num}&type=2&pro={province_code}&city={city_code}&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions=&gm=4'
         elif level_code == 2:
-            # api_zm = f'http://webapi.http.zhimacangku.com/getip?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions={province_code}'
-            api_zm = f'http://http.tiqu.letecs.com/getip3?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions={province_code}&gm=4'
+            api_zm = f'http://webapi.http.zhimacangku.com/getip?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions={province_code}'
+            # api_zm = f'http://http.tiqu.letecs.com/getip3?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions={province_code}&gm=4'
         else:
-            # api_zm = f'http://webapi.http.zhimacangku.com/getip?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions=110000'
-            api_zm = f'http://http.tiqu.letecs.com/getip3?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions=110000&gm=4'
+            api_zm = f'http://webapi.http.zhimacangku.com/getip?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions=110000'
+            # api_zm = f'http://http.tiqu.letecs.com/getip3?num={num}&type=2&pro=0&city=0&yys=0&port=11&pack=115882&ts=1&ys=0&cs=1&lb=1&sb=0&pb=45&mr=1&regions=110000&gm=4'
         resp_ip = requests.get(api_zm)
         if resp_ip.status_code == 200:
             resp_ip_code = resp_ip.json()['code']
@@ -120,9 +119,10 @@ class ProxyUtil:
                 try:
                     self.proxy_logger(f'enrich proxy_pool for {key_code} $$$$$')
                     enrich_res = self.get_proxy_from_zm(3-len(proxy_list_tmp), province_code, cur_city_code,level_code)
-                    if enrich_res != '0':
-                        if enrich_res == '121':
-                            return enrich_res
+                    if enrich_res != 0:
+                        if enrich_res == 121:     # 当且仅当121时再换
+                            self.proxy_select = str(enrich_res)
+                            return self.proxy_select
                         else:
                             self.proxy_logger(f'enrich proxy_pool failed,at {key_code},err_code:{enrich_res}')
                             # return None     # 扩充IP池失败不用着急返回None，但报错需解决
@@ -147,9 +147,10 @@ class ProxyUtil:
                     try:
                         self.proxy_logger(f'enrich proxy_pool for {key_code} *****')
                         enrich_res = self.get_proxy_from_zm(1, province_code, cur_city_code,level_code)
-                        if enrich_res != '0':
-                            if enrich_res == '121':
-                                return enrich_res
+                        if enrich_res != 0:
+                            if enrich_res == 121:
+                                self.proxy_select = str(enrich_res)
+                                return self.proxy_select
                             else:
                                 self.proxy_logger(f'enrich proxy_pool failed,at {key_code},err_code:{enrich_res}')
                                 return None
@@ -167,9 +168,10 @@ class ProxyUtil:
                         try:
                             self.proxy_logger(f'enrich proxy_pool for {key_code} #####')
                             enrich_res = self.get_proxy_from_zm(1, province_code, cur_city_code,level_code)
-                            if enrich_res != '0':
-                                if enrich_res == '121':
-                                    return enrich_res
+                            if enrich_res != 0:
+                                if enrich_res == 121:
+                                    self.proxy_select = str(enrich_res)
+                                    return self.proxy_select
                                 else:
                                     self.proxy_logger(f'enrich proxy_pool failed,at {key_code},err_code:{enrich_res}')
                                     return None
@@ -188,7 +190,7 @@ class ProxyUtil:
                 if enrich_res == 0:
                     self.output_proxy(cur_adcode,cur_header,cur_url)
                 elif (enrich_res == 115) or (enrich_res == 111):
-                    self.proxy_logger('standby')
+                    self.proxy_logger(f'err_code:{enrich_res},standby')
                     time.sleep(2.5)
                     # cur_adcode = '110105'     # 暂不可用时使用北京的proxy(完整爬取时再使用此语句)
                     self.output_proxy(cur_adcode,cur_header,cur_url)
@@ -196,7 +198,8 @@ class ProxyUtil:
                     raise Exception(f"enrich pool failed,Error code from API:{enrich_res}")
             except Exception as ex:
                 self.proxy_logger(f"init except-msg:{ex}")
-                return None
+                self.proxy_select = str(enrich_res)
+                return self.proxy_select
         return self.proxy_select
 
     def check_proxy_valid(self,proxy_str,cur_header,cur_url,key_code,index):

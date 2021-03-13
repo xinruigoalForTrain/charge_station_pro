@@ -120,9 +120,12 @@ class ProxyUtil:
                     self.proxy_logger(f'enrich proxy_pool for {key_code} $$$$$')
                     enrich_res = self.get_proxy_from_zm(3-len(proxy_list_tmp), province_code, cur_city_code,level_code)
                     if enrich_res != 0:
-                        if enrich_res == 121:     # 当且仅当121时再换
-                            self.proxy_select = str(enrich_res)
-                            return self.proxy_select
+                        if enrich_res == 121:     # 当且仅当返回121，且dynamic对应的proxy_pool为空时再换
+                            if len(proxy_list_tmp) == 0:
+                                self.proxy_select = str(enrich_res)
+                                return self.proxy_select
+                            else:
+                                self.proxy_logger(f'enrich failed on {enrich_res},pick out proxy from rest')
                         else:
                             self.proxy_logger(f'enrich proxy_pool failed,at {key_code},err_code:{enrich_res}')
                             # return None     # 扩充IP池失败不用着急返回None，但报错需解决
@@ -149,8 +152,11 @@ class ProxyUtil:
                         enrich_res = self.get_proxy_from_zm(1, province_code, cur_city_code,level_code)
                         if enrich_res != 0:
                             if enrich_res == 121:
-                                self.proxy_select = str(enrich_res)
-                                return self.proxy_select
+                                if len(proxy_list_tmp) == 0:
+                                    self.proxy_select = str(enrich_res)
+                                    return self.proxy_select
+                                else:
+                                    self.proxy_logger(f'enrich failed on {enrich_res},pick out proxy from rest')
                             else:
                                 self.proxy_logger(f'enrich proxy_pool failed,at {key_code},err_code:{enrich_res}')
                                 return None
@@ -170,8 +176,11 @@ class ProxyUtil:
                             enrich_res = self.get_proxy_from_zm(1, province_code, cur_city_code,level_code)
                             if enrich_res != 0:
                                 if enrich_res == 121:
-                                    self.proxy_select = str(enrich_res)
-                                    return self.proxy_select
+                                    if len(proxy_list_tmp) == 0:
+                                        self.proxy_select = str(enrich_res)
+                                        return self.proxy_select
+                                    else:
+                                        self.proxy_logger(f'enrich failed for {enrich_res},pick out proxy from rest')
                                 else:
                                     self.proxy_logger(f'enrich proxy_pool failed,at {key_code},err_code:{enrich_res}')
                                     return None
@@ -194,6 +203,10 @@ class ProxyUtil:
                     time.sleep(2.5)
                     # cur_adcode = '110105'     # 暂不可用时使用北京的proxy(完整爬取时再使用此语句)
                     self.output_proxy(cur_adcode,cur_header,cur_url)
+                elif enrich_res == 121:
+                    self.proxy_logger('zm-API is run out,change to jg')
+                    self.proxy_select = str(enrich_res)
+                    return self.proxy_select
                 else:
                     raise Exception(f"enrich pool failed,Error code from API:{enrich_res}")
             except Exception as ex:
